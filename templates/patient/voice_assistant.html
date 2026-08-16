@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}AI Voice Assistant{% endblock %}
+{% block page_title %}AI Language Translator{% endblock %}
+{% block breadcrumb %}Patient / Voice Assistant{% endblock %}
+
+{% block nav %}
+<span class="nav-section-label">My Health</span>
+<a href="/patient/dashboard" class="nav-link"><span class="icon">🏠</span> Dashboard</a>
+<a href="/patient/predict" class="nav-link"><span class="icon">🤖</span> AI Prediction</a>
+<a href="/patient/history" class="nav-link"><span class="icon"><img src="/static/images/dashboard_icon.png" style="height:1.2em;width:1.2em;vertical-align:-0.2em;"></span> Treatment History</a>
+<a href="/patient/map" class="nav-link"><span class="icon">📍</span> Map and CHI</a>
+<a href="/patient/consult" class="nav-link"><span class="icon">📞</span> Consult a Doctor</a>
+<span class="nav-section-label">Account</span>
+<a href="/patient/profile" class="nav-link"><span class="icon"><img src="/static/images/profile_icon.png" style="height:1.2em;width:1.2em;vertical-align:-0.2em;"></span> My Profile</a>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:24px; border:2px solid #2D5016; background:linear-gradient(135deg, #FBF7F0, #E8F5E9);">
+    <div class="card-header" style="border-bottom:none; padding-bottom:0;">
+        <div>
+            <h3 class="card-title" style="color:#2D5016; font-size:24px;">🎙️ Connect in Your Language</h3>
+            <p style="color:#7A6558; font-size:15px; margin-top:8px;">Speak naturally in Kannada or Hindi, and our AI will translate it to English instantly for your doctor.</p>
+        </div>
+    </div>
+    
+    <div style="padding: 24px;">
+        <!-- Language Selection -->
+        <div style="margin-bottom: 20px;">
+            <label style="font-weight: 600; color: #4A3728; display: block; margin-bottom: 8px;">Select Your Language:</label>
+            <div style="display: flex; gap: 15px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="source_lang" value="kn" checked> Kannada (ಕನ್ನಡ)
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="radio" name="source_lang" value="hi"> Hindi (हिंदी)
+                </label>
+            </div>
+        </div>
+
+        <!-- Dictation Interface -->
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;">
+            <button id="record_btn" onclick="toggleRecording()" style="width:80px; height:80px; border-radius:50%; background:#2D5016; color:#fff; font-size:32px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(45,80,22,0.3); transition: transform 0.2s, background 0.2s; display:flex; align-items:center; justify-content:center;">
+                🎤
+            </button>
+            <p id="record_status" style="margin-top: 16px; color: #666; font-weight: 500;">Click to start speaking</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Source Text -->
+            <div style="background: #FFF9C4; padding: 16px; border-radius: 8px; border: 1px solid #FFF59D;">
+                <h4 style="margin: 0 0 10px 0; color: #F57F17; font-size: 14px;">YOUR SPEECH</h4>
+                <div id="source_text" style="font-size: 16px; color: #333; min-height: 60px;">Listening...</div>
+            </div>
+
+            <!-- Translated Text -->
+            <div style="background: #E1F5FE; padding: 16px; border-radius: 8px; border: 1px solid #B3E5FC;">
+                <h4 style="margin: 0 0 10px 0; color: #0277BD; font-size: 14px; display:flex; justify-content:space-between;">
+                    TRANSLATED ENGLISH
+                    <button class="btn btn-sm" onclick="speakTranslation()" title="Listen to translation" style="background:transparent; border:none; font-size:16px; cursor:pointer; padding:0;">🔊</button>
+                </h4>
+                <div id="translated_text" style="font-size: 16px; color: #333; min-height: 60px;">Waiting for translation...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let recognition;
+    let isRecording = false;
+
+    // Check if the browser supports Speech Recognition
+    if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true; // Show results in real time
+    } else {
+        alert("Your browser does not support Voice Recognition. Please use Google Chrome or Microsoft Edge.");
+    }
+
+    function toggleRecording() {
+        if (!recognition) return;
+
+        const btn = document.getElementById('record_btn');
+        const status = document.getElementById('record_status');
+        const sourceBox = document.getElementById('source_text');
+        
+        if (isRecording) {
+            recognition.stop();
+            return;
+        }
+
+        // Set the language based on radio button
+        const langChoice = document.querySelector('input[name="source_lang"]:checked').value;
+        recognition.lang = langChoice === 'kn' ? 'kn-IN' : 'hi-IN';
+
+        recognition.start();
+        isRecording = true;
+        
+        btn.style.background = '#d32f2f'; // Red for recording
+        btn.innerHTML = '🛑';
+        status.innerText = "Listening... Speak now";
+        sourceBox.innerText = "";
+        document.getElementById('translated_text').innerHTML = "Translating...";
+
+        let finalTranscript = '';
+
+        recognition.onresult = function(e) {
+            let interimTranscript = '';
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) {
+                    finalTranscript += e.results[i][0].transcript;
+                } else {
+                    interimTranscript += e.results[i][0].transcript;
+                }
+            }
+            sourceBox.innerHTML = finalTranscript + '<i style="color:#999">' + interimTranscript + '</i>';
+        };
+
+        recognition.onend = function() {
+            isRecording = false;
+            btn.style.background = '#2D5016';
+            btn.innerHTML = '🎤';
+            status.innerText = "Click to start speaking";
+            
+            if (finalTranscript.trim() !== "") {
+                translateSpeech(finalTranscript.trim(), langChoice);
+            } else {
+                document.getElementById('translated_text').innerHTML = "No speech detected. Please try again.";
+            }
+        };
+
+        recognition.onerror = function(e) {
+            console.error(e);
+            alert("Voice recognition error: " + e.error);
+            isRecording = false;
+            btn.style.background = '#2D5016';
+            btn.innerHTML = '🎤';
+            status.innerText = "Click to start speaking";
+        };
+    }
+
+    async function translateSpeech(text, sourceLang) {
+        const transBox = document.getElementById('translated_text');
+        transBox.innerText = "Translating query to server...";
+        
+        try {
+            const resp = await fetch('/api/translate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text, source_lang: sourceLang})
+            });
+            const data = await resp.json();
+            
+            if(data.success) {
+                transBox.innerText = data.translated;
+                // Auto-speak the translated text using TTS
+                speakTranslation();
+            } else {
+                transBox.innerText = "Translation Error: " + data.error;
+            }
+        } catch(e) {
+            console.error(e);
+            transBox.innerText = "Failed to reach translation server.";
+        }
+    }
+
+    // Text to Speech
+    function speakTranslation() {
+        const text = document.getElementById('translated_text').innerText;
+        if (!text || text.includes("Translating") || text.includes("Waiting")) return;
+        
+        if ('speechSynthesis' in window) {
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'en-US'; 
+            msg.rate = 0.9; // Slightly slower for clarity
+            
+            window.speechSynthesis.speak(msg);
+        } else {
+            console.log("Text to speech not supported by browser.");
+        }
+    }
+</script>
+{% endblock %}
